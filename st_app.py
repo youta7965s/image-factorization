@@ -65,4 +65,5 @@ if uploaded_files:
         # 結果を表示
         result_image = all_images[best_match_index]
         st.write("検索が完了しました！")
+
         st.image(result_image, caption=f"最も似ている画像 (類似度: {similarities.max():.4f})", use_column_width=True)
