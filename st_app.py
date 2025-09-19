@@ -34,27 +34,35 @@ device, processor, model, feature_tensor, all_images = load_model_and_data()
 st.title("類似画像検索アプリ")
 st.write("画像をアップロードすると、データベースの中から最も似ている画像を探します。")
 
-uploaded_file = st.file_uploader("画像をアップロードしてください...", type=["jpg", "jpeg", "png"])
+uploaded_files = st.file_uploader("画像を複数アップロードしてください...", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
-if uploaded_file is not None:
-    # アップロードされた画像を表示
-    query_image = Image.open(uploaded_file).convert("RGB")
-    st.image(query_image, caption="アップロードされた画像", use_column_width=True)
-    
-    # ----- 3. 検索ロジックの実行 -----
-    st.write("検索を実行中...")
-    
-    # クエリ画像をベクトル化 (Notebookのセル3と同じ処理)
-    inputs = processor(images=query_image, return_tensors="pt").to(device)
-    with torch.no_grad():
-        query_features = model.get_image_features(**inputs)
+# 類似画像を検索する
+if uploaded_files:
+    st.write("アップロードされた画像:")
+    query_images = []
+    for uploaded_file in uploaded_files:
+        image = Image.open(uploaded_file).convert("RGB")
+        st.image(image, use_column_width=True)
+        query_images.append(image)
 
-    # コサイン類似度を計算
-    similarities = F.cosine_similarity(query_features, feature_tensor)
-    best_match_index = torch.argmax(similarities).item()
-    result_image = all_images[best_match_index]
-    
-    st.write("検索が完了しました！")
+    # 複数画像のベクトルを計算し、平均ベクトルを作成
+    all_query_features = []
+    for image in query_images:
+        inputs = processor(images=image, return_tensors="pt").to(device)
+        with torch.no_grad():
+            image_features = model.get_image_features(**inputs)
+        all_query_features.append(image_features)
 
-    # 結果の画像を表示
-    st.image(result_image, caption=f"最も似ている画像 (類似度: {similarities.max():.4f})", use_column_width=True)
+    # 平均ベクトルを計算
+    if all_query_features:
+        query_features_tensor = torch.cat(all_query_features)
+        query_features_mean = query_features_tensor.mean(dim=0, keepdim=True)
+        
+        # コサイン類似度を計算
+        similarities = F.cosine_similarity(query_features_mean, feature_tensor)
+        best_match_index = torch.argmax(similarities).item()
+        
+        # 結果を表示
+        result_image = all_images[best_match_index]
+        st.write("検索が完了しました！")
+        st.image(result_image, caption=f"最も似ている画像 (類似度: {similarities.max():.4f})", use_column_width=True)
